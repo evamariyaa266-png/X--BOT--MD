@@ -4,8 +4,7 @@
   "description": "X-BOT-MD is a powerful WhatsApp Helper Bot packed with features like media handling, automation, and more.",
   "main": "index.js",
   "scripts": {
-    "start": "pm2 start . --attach --name X-BOT-MD",
-    "stop": "pm2 stop . --attach --name X-BOT-MD"
+    "start": "node index.js"
   },
   "author": "ASWIN SPARKY",
   "license": "ISC",
