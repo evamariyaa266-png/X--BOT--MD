@@ -1,4 +1,4 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, makeInMemoryStore } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const pino = require('pino');
 const fs = require('fs');
@@ -17,16 +17,22 @@ async function startXBot() {
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false, // QR കോഡിന് പകരം പെയറിങ് കോഡ് ഉപയോഗിക്കാൻ ഇത് false വെക്കുക
+        printQRInTerminal: false,
         version: version,
         logger: pino({ level: 'silent' })
     });
 
-    // പെയറിങ് കോഡ് ഓപ്ഷൻ
     if (!sock.authState.creds.registered) {
-        const phoneNumber = await question('Please enter your WhatsApp number (e.g., 919876543210): ');
-        let code = await sock.requestPairingCode(phoneNumber.trim());
-        console.log(`Your Pairing Code: ${code}`);
+        console.log('\n--- WhatsApp Pairing Code Generator ---');
+        const phoneNumber = await question('Enter your WhatsApp number with country code (e.g., 919876543210): ');
+        
+        // ചെറിയൊരു ഡിലേ നൽകി പെയറിങ് കോഡ് റിക്വസ്റ്റ് ചെയ്യുന്നു
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        let code = await sock.requestPairingCode(phoneNumber.trim().replace(/[^0-9]/g, ''));
+        
+        console.log('\n========================================');
+        console.log(`YOUR PAIRING CODE IS: ${code}`);
+        console.log('========================================\n');
     }
 
     sock.ev.on('connection.update', async (update) => {
@@ -37,7 +43,7 @@ async function startXBot() {
         } else if (connection === 'close') {
             const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
             if (reason === DisconnectReason.loggedOut) {
-                console.log('Device logged out. Please delete session folder and restart.');
+                console.log('Device logged out. Please delete the session folder and restart.');
             } else {
                 console.log('Connection closed, reconnecting...');
                 startXBot();
