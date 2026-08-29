@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 
 app.get('/', (req, res) => {
-    res.send('EVA-MARIYA-MD is running!');
+    res.send('X-BOT-MD is running!');
 });
 
 app.listen(PORT, () => {
@@ -21,17 +21,30 @@ async function startBot() {
     const conn = makeWASocket({
         logger: pino({ level: 'silent' }),
         auth: state,
-        printQRInTerminal: false
+        printQRInTerminal: false,
+        browser: ["Ubuntu", "Chrome", "20.0.04"] // പെയറിങ് കോഡ് എളുപ്പത്തിൽ ലഭിക്കാൻ ഇത് സഹായിക്കും
     });
 
     conn.ev.on('creds.update', saveCreds);
 
-    // സോക്കറ്റ് കണക്ഷൻ അപ്ഡേറ്റ് വഴി പെയറിങ് കോഡ് ജനറേറ്റ് ചെയ്യുന്നത് ലൂപ്പ് തടയും
+    // X-BOT-MD പെയറിങ് കോഡ് ജനറേഷൻ
+    if (!conn.authState.creds.registered) {
+        setTimeout(async () => {
+            try {
+                let phoneNumber = "918086460391";
+                let code = await conn.requestPairingCode(phoneNumber);
+                console.log(`🔑 NEW PAIRING CODE FOR X-BOT-MD: ${code}`);
+            } catch (error) {
+                console.log('⚠️ Pairing code generation failed. Please wait or restart.');
+            }
+        }, 5000);
+    }
+
     conn.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect } = update;
         
         if (connection === 'open') {
-            console.log('Connected successfully! EVA-MARIYA is active.');
+            console.log('✅ Connected successfully! X-BOT-MD is active.');
         } else if (connection === 'close') {
             const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
             if (shouldReconnect) {
@@ -40,20 +53,7 @@ async function startBot() {
         }
     });
 
-    // ബോട്ട് രജിസ്റ്റർ ചെയ്തിട്ടില്ലെങ്കിൽ കൃത്യമായ സമയത്ത് പെയറിങ് കോഡ് ചോദിക്കുന്നു
-    if (!conn.authState.creds.registered) {
-        setTimeout(async () => {
-            try {
-                let phoneNumber = "918086460391";
-                let code = await conn.requestPairingCode(phoneNumber);
-                console.log(`🔑 NEW PAIRING CODE: ${code}`);
-            } catch (error) {
-                console.log('Pairing code generation waiting for socket...');
-            }
-        }, 8000);
-    }
-
-    // Automatically load all plugins
+    // പ്ലഗിനുകൾ ലോഡ് ചെയ്യാൻ
     const pluginsPath = path.join(__dirname, 'plugins');
     if (fs.existsSync(pluginsPath)) {
         fs.readdirSync(pluginsPath).forEach((file) => {
