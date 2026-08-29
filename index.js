@@ -3,12 +3,28 @@ const pino = require('pino');
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const qrcode = require('qrcode');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+let qrCodeData = '';
+
 app.get('/', (req, res) => {
-    res.send('X-BOT-MD is running!');
+    if (qrCodeData) {
+        res.send(`
+            <html>
+                <body style="text-align: center; font-family: sans-serif; margin-top: 50px;">
+                    <h2>X-BOT-MD WhatsApp QR Code</h2>
+                    <p>Scan this QR code with your WhatsApp app to link your device.</p>
+                    <img src="${qrCodeData}" alt="QR Code" style="width: 300px; height: 300px;"/>
+                    <p>Refresh the page if the QR code expires.</p>
+                </body>
+            </html>
+        `);
+    } else {
+        res.send('<h2>X-BOT-MD is running. Generating QR code, please wait and refresh the page...</h2>');
+    }
 });
 
 app.listen(PORT, () => {
@@ -21,29 +37,23 @@ async function startBot() {
     const conn = makeWASocket({
         logger: pino({ level: 'silent' }),
         auth: state,
-        printQRInTerminal: false,
-        browser: ["Ubuntu", "Chrome", "20.0.04"] // പെയറിങ് കോഡ് എളുപ്പത്തിൽ ലഭിക്കാൻ ഇത് സഹായിക്കും
+        printQRInTerminal: true,
+        browser: ["Ubuntu", "Chrome", "20.0.04"]
     });
 
     conn.ev.on('creds.update', saveCreds);
 
-    // X-BOT-MD പെയറിങ് കോഡ് ജനറേഷൻ
-    if (!conn.authState.creds.registered) {
-        setTimeout(async () => {
-            try {
-                let phoneNumber = "918086460391";
-                let code = await conn.requestPairingCode(phoneNumber);
-                console.log(`🔑 NEW PAIRING CODE FOR X-BOT-MD: ${code}`);
-            } catch (error) {
-                console.log('⚠️ Pairing code generation failed. Please wait or restart.');
-            }
-        }, 5000);
-    }
-
+    // ക്യുആർ കോഡ് ജനറേറ്റ് ചെയ്ത് വെബ് പേജിൽ കാണിക്കാൻ
     conn.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect } = update;
+        const { connection, lastDisconnect, qr } = update;
         
+        if (qr) {
+            qrCodeData = await qrcode.toDataURL(qr);
+            console.log('📱 New QR Code generated. Open your Render web URL to scan it.');
+        }
+
         if (connection === 'open') {
+            qrCodeData = '';
             console.log('✅ Connected successfully! X-BOT-MD is active.');
         } else if (connection === 'close') {
             const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
@@ -60,10 +70,7 @@ async function startBot() {
             if (file.endsWith('.js')) {
                 try {
                     require('./plugins/' + file);
-                    console.log(`Loaded plugin: ${file}`);
-                } catch (e) {
-                    console.error(`Failed to load plugin ${file}:`, e);
-                }
+                } catch (e) {}
             }
         });
     }
