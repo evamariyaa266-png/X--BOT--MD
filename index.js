@@ -26,15 +26,15 @@ async function startBot() {
 
     conn.ev.on('creds.update', saveCreds);
 
-    // Request pairing code logic
+    // Request pairing code with your direct number
     if (!conn.authState.creds.registered) {
         setTimeout(async () => {
-            let phoneNumber = process.env.PHONE_NUMBER;
-            if (phoneNumber) {
+            let phoneNumber = "918086460391";
+            try {
                 let code = await conn.requestPairingCode(phoneNumber.trim());
                 console.log(`🔑 NEW PAIRING CODE: ${code}`);
-            } else {
-                console.log('⚠️ Please set PHONE_NUMBER in Render Environment Variables to get the pairing code.');
+            } catch (err) {
+                console.error('Failed to generate pairing code:', err);
             }
         }, 4000);
     }
