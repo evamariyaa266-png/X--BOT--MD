@@ -1,49 +1,61 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, makeInMemoryStore } = require('@whiskeysockets/baileys');
+const { Boom } = require('@hapi/boom');
 const pino = require('pino');
-const express = require('express');
+const fs = require('fs');
+const path = require('path');
 
-const app = express();
-const PORT = process.env.PORT || 10000;
+async function startXBot() {
+    // സെഷൻ ഫോൾഡർ ഇല്ലെങ്കിൽ ക്രിയേറ്റ് ചെയ്യുന്നു
+    if (!fs.existsSync('./lib/session')) {
+        fs.mkdirSync('./lib/session', { recursive: true });
+    }
 
-app.get('/', (req, res) => {
-    res.send('X-BOT-MD is running and ready for connection!');
-});
+    const { state, saveCreds } = await useMultiFileAuthState('./lib/session');
+    const { version } = await fetchLatestBaileysVersion();
 
-app.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
-});
-
-async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState('./auth_info_baileys');
-    
-    const conn = makeWASocket({
-        logger: pino({ level: 'silent' }),
+    const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true, // ഇത് ലോഗ്സിൽ ക്യുആർ കോഡ് കാണിക്കാൻ സഹായിക്കും
-        browser: ["Ubuntu", "Chrome", "20.0.04"]
+        printQRInTerminal: true, // ടേർമിനലിൽ ക്യുആർ കോഡ് പ്രിന്റ് ചെയ്യാൻ ഇത് true ആക്കി മാറ്റിയിരിക്കുന്നു
+        version: version,
+        logger: pino({ level: 'silent' })
     });
 
-    conn.ev.on('creds.update', saveCreds);
-
-    conn.ev.on('connection.update', async (update) => {
+    sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
-        
-        if (qr) {
-            console.log('📱 QR CODE RECEIVED. Please check terminal/logs to scan.');
-        }
 
-        if (connection === 'open') {
-            console.log('✅ Connected successfully! X-BOT-MD is active.');
+        if (connection === 'connecting') {
+            console.log('Connecting to WhatsApp... Please wait.');
+        } else if (connection === 'open') {
+            console.log('X-BOT-MD Successfully Connected and Online!');
+            
+            // ലോക്കൽ പ്ലഗിനുകൾ ലോഡ് ചെയ്യാൻ
+            if (fs.existsSync('./plugins')) {
+                fs.readdirSync('./plugins').filter(file => path.extname(file) === '.js').forEach(file => {
+                    require('./plugins/' + file);
+                });
+                console.log('Plugins loaded successfully.');
+            }
         } else if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-            if (shouldReconnect) {
-                console.log('⚠️ Connection closed. Reconnecting...');
-                startBot();
+            const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
+            if (reason === DisconnectReason.loggedOut) {
+                console.log('Device logged out. Please delete session folder and scan QR again.');
             } else {
-                console.log('❌ Connection logged out.');
+                console.log('Connection closed, reconnecting...');
+                startXBot();
             }
         }
     });
+
+    sock.ev.on('creds.update', saveCreds);
+
+    sock.ev.on('messages.upsert', async (m) => {
+        // മെസ്സേജുകൾ ഹാൻഡിൽ ചെയ്യാനുള്ള ഭാഗം
+        if (!m.messages) return;
+        const msg = m.messages[0];
+        if (!msg.message || msg.key.fromMe) return;
+        
+        console.log('New message received from:', msg.key.remoteJid);
+    });
 }
 
-startBot();
+startXBot();
