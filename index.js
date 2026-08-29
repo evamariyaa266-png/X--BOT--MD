@@ -26,21 +26,10 @@ async function startBot() {
 
     conn.ev.on('creds.update', saveCreds);
 
-    // സുരക്ഷിതമായി കണക്ഷൻ വെച്ച് പെയറിങ് കോഡ് റിക്വസ്റ്റ് ചെയ്യുന്ന രീതി
-    if (!conn.authState.creds.registered) {
-        setTimeout(async () => {
-            try {
-                let phoneNumber = "918086460391";
-                let code = await conn.requestPairingCode(phoneNumber);
-                console.log(`🔑 NEW PAIRING CODE: ${code}`);
-            } catch (error) {
-                console.log('Pairing code generation retrying...');
-            }
-        }, 6000);
-    }
-
+    // സോക്കറ്റ് കണക്ഷൻ അപ്ഡേറ്റ് വഴി പെയറിങ് കോഡ് ജനറേറ്റ് ചെയ്യുന്നത് ലൂപ്പ് തടയും
     conn.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect } = update;
+        
         if (connection === 'open') {
             console.log('Connected successfully! EVA-MARIYA is active.');
         } else if (connection === 'close') {
@@ -50,6 +39,19 @@ async function startBot() {
             }
         }
     });
+
+    // ബോട്ട് രജിസ്റ്റർ ചെയ്തിട്ടില്ലെങ്കിൽ കൃത്യമായ സമയത്ത് പെയറിങ് കോഡ് ചോദിക്കുന്നു
+    if (!conn.authState.creds.registered) {
+        setTimeout(async () => {
+            try {
+                let phoneNumber = "918086460391";
+                let code = await conn.requestPairingCode(phoneNumber);
+                console.log(`🔑 NEW PAIRING CODE: ${code}`);
+            } catch (error) {
+                console.log('Pairing code generation waiting for socket...');
+            }
+        }, 8000);
+    }
 
     // Automatically load all plugins
     const pluginsPath = path.join(__dirname, 'plugins');
