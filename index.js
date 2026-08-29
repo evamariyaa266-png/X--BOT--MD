@@ -26,7 +26,7 @@ async function startBot() {
 
     conn.ev.on('creds.update', saveCreds);
 
-    // Request pairing code with your direct number
+    // ടൈം ഔട്ട് സമയം 10 സെക്കൻഡ് ആയി കൂട്ടിയിരിക്കുന്നു
     if (!conn.authState.creds.registered) {
         setTimeout(async () => {
             let phoneNumber = "918086460391";
@@ -36,7 +36,7 @@ async function startBot() {
             } catch (err) {
                 console.error('Failed to generate pairing code:', err);
             }
-        }, 4000);
+        }, 10000);
     }
 
     conn.ev.on('connection.update', (update) => {
