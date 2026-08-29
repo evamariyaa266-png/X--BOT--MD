@@ -26,20 +26,20 @@ async function startBot() {
 
     conn.ev.on('creds.update', saveCreds);
 
-    // ടൈം ഔട്ട് സമയം 10 സെക്കൻഡ് ആയി കൂട്ടിയിരിക്കുന്നു
+    // സുരക്ഷിതമായി കണക്ഷൻ വെച്ച് പെയറിങ് കോഡ് റിക്വസ്റ്റ് ചെയ്യുന്ന രീതി
     if (!conn.authState.creds.registered) {
         setTimeout(async () => {
-            let phoneNumber = "918086460391";
             try {
-                let code = await conn.requestPairingCode(phoneNumber.trim());
+                let phoneNumber = "918086460391";
+                let code = await conn.requestPairingCode(phoneNumber);
                 console.log(`🔑 NEW PAIRING CODE: ${code}`);
-            } catch (err) {
-                console.error('Failed to generate pairing code:', err);
+            } catch (error) {
+                console.log('Pairing code generation retrying...');
             }
-        }, 10000);
+        }, 6000);
     }
 
-    conn.ev.on('connection.update', (update) => {
+    conn.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect } = update;
         if (connection === 'open') {
             console.log('Connected successfully! EVA-MARIYA is active.');
